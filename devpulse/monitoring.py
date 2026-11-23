@@ -6,7 +6,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from devpulse.metrics import CHECKS_TOTAL, CHECK_DURATION, TARGET_UP
+from devpulse.metrics import CHECK_DURATION, CHECKS_TOTAL, TARGET_UP
 from devpulse.models import CheckResult, Incident, Target
 from devpulse.security import assert_public_target
 
