@@ -59,3 +59,12 @@ variable "health_check_path" {
   type    = string
   default = "/ready"
 }
+
+variable "api_key_secret_arn" {
+  type        = string
+  description = "Secrets Manager ARN containing the DevPulse API key as its SecretString"
+}
+variable "database_url_secret_arn" {
+  type        = string
+  description = "Secrets Manager ARN containing the production SQLAlchemy DATABASE_URL"
+}
