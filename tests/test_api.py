@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from devpulse.db import Base, engine
 from devpulse.main import app
 
+
 @pytest.fixture(autouse=True)
 def reset_db():
     Base.metadata.drop_all(bind=engine)
