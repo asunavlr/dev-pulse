@@ -159,3 +159,26 @@ MIT
 ## AWS deployment (Terraform)
 
 The [infra/](infra/README.md) directory provisions an ECS Fargate service behind an Application Load Balancer, with task isolation security groups and CloudWatch logs. Start from infra/terraform/terraform.tfvars.example and provide an existing VPC, two public subnets and an immutable ECR image digest. The GitHub workflow validates Terraform; it does not deploy resources. Review the security and cost notes before applying.
+
+
+## Production-oriented capabilities
+
+- API key protection for target management, manual checks, incident data and Prometheus metrics. Send `X-API-Key` with every protected request.
+- Optional recurring checks (`SCHEDULER_ENABLED=true`) with a configurable interval and per-cycle target cap. Run a single scheduler-enabled API process unless you add distributed scheduling/locking.
+- SSRF guard rejects localhost, private/link-local IPs and hostnames resolving to non-public addresses; redirects are disabled and proxy environment variables are ignored. Production deployments should also enforce outbound network egress rules to mitigate DNS rebinding and metadata-service access.
+- `/health` is a liveness endpoint; `/ready` checks database connectivity.
+- Docker image runs as a non-root user and includes a container health check.
+
+## Local setup
+
+```bash
+cp .env.example .env
+# Set a unique API_KEY before exposing the service.
+docker compose up --build
+```
+
+```bash
+curl -H "X-API-Key: $API_KEY" http://localhost:8000/targets
+```
+
+Set `ENVIRONMENT=production` and provide an API key of at least 32 characters. The default key is for local development only. The scheduler runs in-process for this portfolio deployment; horizontally scaled production deployments should move scheduling to a dedicated worker with distributed coordination.
