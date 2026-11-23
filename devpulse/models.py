@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from devpulse.db import Base
 
+
 class Target(Base):
     __tablename__ = "targets"
     id: Mapped[int] = mapped_column(primary_key=True)
