@@ -122,9 +122,9 @@ resource "aws_cloudwatch_log_group" "app" {
 }
 
 resource "aws_iam_role" "execution" {
-  name = "${local.name}-execution-role"
+  name               = "${local.name}-execution-role"
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
       Principal = { Service = "ecs-tasks.amazonaws.com" }
@@ -140,10 +140,10 @@ resource "aws_iam_role_policy_attachment" "execution" {
 }
 
 resource "aws_iam_role_policy" "secrets" {
-  name = "${local.name}-read-runtime-secrets"
-  role = aws_iam_role.execution.id
+  name   = "${local.name}-read-runtime-secrets"
+  role   = aws_iam_role.execution.id
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
@@ -161,9 +161,9 @@ resource "aws_ecs_task_definition" "app" {
   execution_role_arn       = aws_iam_role.execution.arn
 
   container_definitions = jsonencode([{
-    name      = local.name
-    image     = var.container_image
-    essential = true
+    name        = local.name
+    image       = var.container_image
+    essential   = true
     environment = [
       { name = "ENVIRONMENT", value = "production" },
       { name = "SCHEDULER_ENABLED", value = "false" }
@@ -179,7 +179,7 @@ resource "aws_ecs_task_definition" "app" {
     }]
     logConfiguration = {
       logDriver = "awslogs"
-      options = {
+      options   = {
         awslogs-group         = aws_cloudwatch_log_group.app.name
         awslogs-region        = var.aws_region
         awslogs-stream-prefix = "app"
@@ -202,12 +202,12 @@ resource "aws_ecs_task_definition" "worker" {
   network_mode             = "awsvpc"
   cpu                      = var.task_cpu
   memory                   = var.task_memory
-  execution_role_arn   = aws_iam_role.execution.arn
-  container_definitions = jsonencode([{
-    name      = "${local.name}-worker"
-    image     = var.container_image
-    essential = true
-    command   = ["python", "-m", "devpulse.worker"]
+  execution_role_arn       = aws_iam_role.execution.arn
+  container_definitions    = jsonencode([{
+    name        = "${local.name}-worker"
+    image       = var.container_image
+    essential   = true
+    command     = ["python", "-m", "devpulse.worker"]
     environment = [
       { name = "ENVIRONMENT", value = "production" },
       { name = "SCHEDULER_ENABLED", value = "true" },
@@ -219,7 +219,7 @@ resource "aws_ecs_task_definition" "worker" {
     ]
     logConfiguration = {
       logDriver = "awslogs"
-      options = {
+      options   = {
         awslogs-group         = aws_cloudwatch_log_group.app.name
         awslogs-region        = var.aws_region
         awslogs-stream-prefix = "worker"
@@ -230,11 +230,11 @@ resource "aws_ecs_task_definition" "worker" {
 }
 
 resource "aws_ecs_service" "worker" {
-  name            = "${local.name}-worker"
-  cluster         = aws_ecs_cluster.app.id
-  task_definition = aws_ecs_task_definition.worker.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                               = "${local.name}-worker"
+  cluster                            = aws_ecs_cluster.app.id
+  task_definition                    = aws_ecs_task_definition.worker.arn
+  desired_count                      = 1
+  launch_type                        = "FARGATE"
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
   deployment_circuit_breaker {
@@ -320,7 +320,7 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu" {
   evaluation_periods  = 2
   threshold           = 85
   comparison_operator = "GreaterThanThreshold"
-  dimensions = {
+  dimensions          = {
     ClusterName = aws_ecs_cluster.app.name
     ServiceName = aws_ecs_service.app.name
   }
@@ -337,7 +337,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   evaluation_periods  = 1
   threshold           = 5
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  dimensions = {
+  dimensions          = {
     LoadBalancer = aws_lb.app.arn_suffix
   }
   tags = local.tags
