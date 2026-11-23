@@ -19,9 +19,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self):
-        if self.environment.lower() == "production":
-            if self.api_key == "dev-only-change-me" or len(self.api_key) < 32:
-                raise ValueError("Set a unique API_KEY with at least 32 characters in production")
+        if (
+            self.environment.lower() == "production"
+            and (self.api_key == "dev-only-change-me" or len(self.api_key) < 32)
+        ):
+            raise ValueError("Set a unique API_KEY with at least 32 characters in production")
         return self
 
 
