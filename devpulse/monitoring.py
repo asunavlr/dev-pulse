@@ -1,8 +1,10 @@
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 from devpulse.metrics import CHECKS_TOTAL, CHECK_DURATION, TARGET_UP
 from devpulse.models import CheckResult, Incident, Target
 
@@ -53,7 +55,7 @@ async def run_check(db: Session, target: Target) -> CheckResult:
         for incident in active:
             if incident.kind == "availability" or (incident.kind == "latency" and is_up):
                 incident.active = False
-                incident.resolved_at = datetime.now(timezone.utc)
+                incident.resolved_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(result)
