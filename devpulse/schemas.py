@@ -1,5 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel, Field, HttpUrl, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 class TargetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=160)
