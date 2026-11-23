@@ -5,6 +5,9 @@ from devpulse.db import Base, engine
 from devpulse.main import app
 
 
+HEADERS = {"X-API-Key": "dev-only-change-me"}
+
+
 @pytest.fixture(autouse=True)
 def reset_db():
     Base.metadata.drop_all(bind=engine)
@@ -26,10 +29,16 @@ def test_protected_routes_require_api_key():
 
 def test_create_list_and_delete_target():
     with TestClient(app) as client:
-        created = client.post("/targets", headers=HEADERS, json={
-            "name": "Example", "url": "https://1.1.1.1/health",
-            "timeout_seconds": 3, "latency_threshold_ms": 500
-        })
+        created = client.post(
+            "/targets",
+            headers=HEADERS,
+            json={
+                "name": "Example",
+                "url": "https://1.1.1.1/health",
+                "timeout_seconds": 3,
+                "latency_threshold_ms": 500,
+            },
+        )
         assert created.status_code == 201
         target_id = created.json()["id"]
         assert client.get("/targets", headers=HEADERS).json()[0]["name"] == "Example"
@@ -38,7 +47,12 @@ def test_create_list_and_delete_target():
 
 def test_rejects_private_target():
     with TestClient(app) as client:
-        response = client.post("/targets", headers=HEADERS, json={
-            "name": "Metadata", "url": "http://169.254.169.254/latest/meta-data/"
-        })
+        response = client.post(
+            "/targets",
+            headers=HEADERS,
+            json={
+                "name": "Metadata",
+                "url": "http://169.254.169.254/latest/meta-data/",
+            },
+        )
         assert response.status_code == 422
