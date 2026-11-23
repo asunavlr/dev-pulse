@@ -1,3 +1,4 @@
+import asyncio
 import time
 from datetime import UTC, datetime
 
@@ -7,22 +8,29 @@ from sqlalchemy.orm import Session
 
 from devpulse.metrics import CHECKS_TOTAL, CHECK_DURATION, TARGET_UP
 from devpulse.models import CheckResult, Incident, Target
+from devpulse.security import assert_public_target
+
 
 async def run_check(db: Session, target: Target) -> CheckResult:
     started = time.perf_counter()
     status_code = None
     error = None
     try:
+        await asyncio.to_thread(assert_public_target, target.url)
         async with httpx.AsyncClient(
             timeout=target.timeout_seconds,
             follow_redirects=False,
-            headers={"User-Agent": "DevPulse-Monitor/0.1"},
+            trust_env=False,
+            headers={"User-Agent": "DevPulse-Monitor/0.2"},
         ) as client:
             response = await client.get(target.url)
             status_code = response.status_code
             is_up = 200 <= response.status_code < 400
             if not is_up:
                 error = f"Unexpected HTTP status: {response.status_code}"
+    except ValueError as exc:
+        is_up = False
+        error = str(exc)
     except httpx.TimeoutException:
         is_up = False
         error = "Request timed out"
