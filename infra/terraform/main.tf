@@ -139,6 +139,19 @@ resource "aws_iam_role_policy_attachment" "execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "secrets" {
+  name = "${local.name}-read-runtime-secrets"
+  role = aws_iam_role.execution.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = [var.api_key_secret_arn, var.database_url_secret_arn]
+    }]
+  })
+}
+
 resource "aws_ecs_task_definition" "app" {
   family                   = local.name
   requires_compatibilities = ["FARGATE"]
@@ -151,6 +164,14 @@ resource "aws_ecs_task_definition" "app" {
     name      = local.name
     image     = var.container_image
     essential = true
+    environment = [
+      { name = "ENVIRONMENT", value = "production" },
+      { name = "SCHEDULER_ENABLED", value = "false" }
+    ]
+    secrets = [
+      { name = "API_KEY", valueFrom = var.api_key_secret_arn },
+      { name = "DATABASE_URL", valueFrom = var.database_url_secret_arn }
+    ]
     portMappings = [{
       containerPort = var.app_port
       hostPort      = var.app_port
@@ -172,6 +193,63 @@ resource "aws_ecs_task_definition" "app" {
       startPeriod = 15
     }
   }])
+  tags = local.tags
+}
+
+resource "aws_ecs_task_definition" "worker" {
+  family                   = "${local.name}-worker"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.task_cpu
+  memory                   = var.task_memory
+  execution_role_arn       = aws_iam_role.execution.arn
+  container_definitions = jsonencode([{
+    name      = "${local.name}-worker"
+    image     = var.container_image
+    essential = true
+    command   = ["python", "-m", "devpulse.worker"]
+    environment = [
+      { name = "ENVIRONMENT", value = "production" },
+      { name = "SCHEDULER_ENABLED", value = "true" },
+      { name = "CHECK_INTERVAL_SECONDS", value = "60" }
+    ]
+    secrets = [
+      { name = "API_KEY", valueFrom = var.api_key_secret_arn },
+      { name = "DATABASE_URL", valueFrom = var.database_url_secret_arn }
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.app.name
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = "worker"
+      }
+    }
+  }])
+  tags = local.tags
+}
+
+resource "aws_ecs_service" "worker" {
+  name            = "${local.name}-worker"
+  cluster         = aws_ecs_cluster.app.id
+  task_definition = aws_ecs_task_definition.worker.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+  network_configuration {
+    subnets          = var.private_subnet_ids
+    security_groups  = [aws_security_group.tasks.id]
+    assign_public_ip = false
+  }
+  depends_on = [
+    aws_iam_role_policy_attachment.execution,
+    aws_iam_role_policy.secrets
+  ]
   tags = local.tags
 }
 
@@ -201,7 +279,8 @@ resource "aws_ecs_service" "app" {
   }
   depends_on = [
     aws_lb_listener.https,
-    aws_iam_role_policy_attachment.execution
+    aws_iam_role_policy_attachment.execution,
+    aws_iam_role_policy.secrets
   ]
   tags = local.tags
 }
