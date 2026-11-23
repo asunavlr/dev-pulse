@@ -1,6 +1,10 @@
-aws_region = "eu-west-1"
-project_name = "devpulse"
-vpc_id = "vpc-xxxxxxxx"
-public_subnet_ids = ["subnet-aaaaaaaa", "subnet-bbbbbbbb"]
-container_image = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/devpulse@sha256:REPLACE_WITH_IMAGE_DIGEST"
-desired_count = 1
+aws_region        = "eu-west-1"
+project_name      = "devpulse"
+vpc_id            = "vpc-xxxxxxxx"
+public_subnet_ids = ["subnet-public-a", "subnet-public-b"]
+private_subnet_ids = ["subnet-private-a", "subnet-private-b"]
+certificate_arn   = "arn:aws:acm:eu-west-1:123456789012:certificate/REPLACE_ME"
+container_image   = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/devpulse@sha256:REPLACE_WITH_IMAGE_DIGEST"
+desired_count     = 1
+min_capacity      = 1
+max_capacity      = 3
