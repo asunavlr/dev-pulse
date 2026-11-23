@@ -254,12 +254,11 @@ resource "aws_ecs_service" "worker" {
 }
 
 resource "aws_ecs_service" "app" {
-  name            = "${local.name}-service"
-  cluster         = aws_ecs_cluster.app.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = var.desired_count
-  launch_type     = "FARGATE"
-
+  name                               = "${local.name}-service"
+  cluster                            = aws_ecs_cluster.app.id
+  task_definition                    = aws_ecs_task_definition.app.arn
+  desired_count                      = var.desired_count
+  launch_type                        = "FARGATE"
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
   deployment_circuit_breaker {
@@ -282,7 +281,7 @@ resource "aws_ecs_service" "app" {
     aws_iam_role_policy_attachment.execution,
     aws_iam_role_policy.secrets
   ]
-  tags = local.tags
+  tags                               = local.tags
 }
 
 resource "aws_appautoscaling_target" "ecs" {
