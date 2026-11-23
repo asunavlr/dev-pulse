@@ -8,11 +8,18 @@ locals {
 
 resource "aws_security_group" "alb" {
   name        = "${local.name}-alb"
-  description = "Public HTTP ingress"
+  description = "Public HTTPS ingress"
   vpc_id      = var.vpc_id
+
   ingress {
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -29,6 +36,7 @@ resource "aws_security_group" "tasks" {
   name        = "${local.name}-tasks"
   description = "Only ALB can reach tasks"
   vpc_id      = var.vpc_id
+
   ingress {
     from_port       = var.app_port
     to_port         = var.app_port
@@ -59,6 +67,7 @@ resource "aws_lb_target_group" "app" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+
   health_check {
     path                = var.health_check_path
     healthy_threshold   = 2
@@ -73,6 +82,24 @@ resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.app.arn
   port              = 80
   protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = var.certificate_arn
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
@@ -99,9 +126,9 @@ resource "aws_iam_role" "execution" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
+      Effect    = "Allow"
       Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action = "sts:AssumeRole"
+      Action    = "sts:AssumeRole"
     }]
   })
   tags = local.tags
@@ -116,10 +143,11 @@ resource "aws_ecs_task_definition" "app" {
   family                   = local.name
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = var.task_cpu
+  memory                   = var.task_memory
   execution_role_arn       = aws_iam_role.execution.arn
-  container_definitions    = jsonencode([{
+
+  container_definitions = jsonencode([{
     name      = local.name
     image     = var.container_image
     essential = true
@@ -136,6 +164,13 @@ resource "aws_ecs_task_definition" "app" {
         awslogs-stream-prefix = "app"
       }
     }
+    healthCheck = {
+      command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:${var.app_port}/ready', timeout=2)\""]
+      interval    = 30
+      timeout     = 5
+      retries     = 3
+      startPeriod = 15
+    }
   }])
   tags = local.tags
 }
@@ -146,18 +181,85 @@ resource "aws_ecs_service" "app" {
   task_definition = aws_ecs_task_definition.app.arn
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
+
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   network_configuration {
-    subnets          = var.public_subnet_ids
+    subnets          = var.private_subnet_ids
     security_groups  = [aws_security_group.tasks.id]
-    assign_public_ip = true
+    assign_public_ip = false
   }
   load_balancer {
     target_group_arn = aws_lb_target_group.app.arn
     container_name   = local.name
     container_port   = var.app_port
   }
-  depends_on = [aws_lb_listener.http, aws_iam_role_policy_attachment.execution]
-  tags       = local.tags
+  depends_on = [
+    aws_lb_listener.https,
+    aws_iam_role_policy_attachment.execution
+  ]
+  tags = local.tags
+}
+
+resource "aws_appautoscaling_target" "ecs" {
+  max_capacity       = var.max_capacity
+  min_capacity       = var.min_capacity
+  resource_id        = "service/${aws_ecs_cluster.app.name}/${aws_ecs_service.app.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "cpu" {
+  name               = "${local.name}-cpu-target-tracking"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs.resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    target_value       = 65
+    scale_in_cooldown  = 180
+    scale_out_cooldown = 60
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "${local.name}-high-cpu"
+  alarm_description   = "ECS service average CPU is above 85 percent"
+  namespace           = "AWS/ECS"
+  metric_name         = "CPUUtilization"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 85
+  comparison_operator = "GreaterThanThreshold"
+  dimensions = {
+    ClusterName = aws_ecs_cluster.app.name
+    ServiceName = aws_ecs_service.app.name
+  }
+  tags = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
+  alarm_name          = "${local.name}-alb-5xx"
+  alarm_description   = "Application load balancer is returning elevated 5xx responses"
+  namespace           = "AWS/ApplicationELB"
+  metric_name         = "HTTPCode_ELB_5XX_Count"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 5
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  dimensions = {
+    LoadBalancer = aws_lb.app.arn_suffix
+  }
+  tags = local.tags
 }
