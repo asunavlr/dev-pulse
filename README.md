@@ -154,3 +154,8 @@ scrape_configs:
 ## License
 
 MIT
+
+
+## AWS deployment (Terraform)
+
+The [infra/](infra/README.md) directory provisions an ECS Fargate service behind an Application Load Balancer, with task isolation security groups and CloudWatch logs. Start from infra/terraform/terraform.tfvars.example and provide an existing VPC, two public subnets and an immutable ECR image digest. The GitHub workflow validates Terraform; it does not deploy resources. Review the security and cost notes before applying.

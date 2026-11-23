@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
-from datetime import datetime
+
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 from devpulse.core.config import get_settings
 from devpulse.db import get_db, initialize_database
 from devpulse.models import CheckResult, Incident, Target

@@ -1,6 +1,8 @@
 from datetime import datetime
+
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from devpulse.db import Base
 
 class Target(Base):
@@ -29,7 +31,7 @@ class Incident(Base):
     __tablename__ = "incidents"
     id: Mapped[int] = mapped_column(primary_key=True)
     target_id: Mapped[int] = mapped_column(ForeignKey("targets.id", ondelete="CASCADE"), nullable=False)
-    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
