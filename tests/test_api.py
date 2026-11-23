@@ -1,5 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
+
+import pytest
 
 from devpulse.db import Base, engine
 from devpulse.main import app
