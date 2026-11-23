@@ -11,6 +11,7 @@ from devpulse.models import CheckResult, Incident, Target
 from devpulse.security import assert_public_target
 
 
+
 async def run_check(db: Session, target: Target) -> CheckResult:
     started = time.perf_counter()
     status_code = None

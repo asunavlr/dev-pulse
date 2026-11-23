@@ -4,8 +4,6 @@ from fastapi.testclient import TestClient
 from devpulse.db import Base, engine
 from devpulse.main import app
 
-HEADERS = {"X-API-Key": "dev-only-change-me"}
-
 
 @pytest.fixture(autouse=True)
 def reset_db():

@@ -15,6 +15,7 @@ from devpulse.schemas import CheckResponse, IncidentResponse, TargetCreate, Targ
 from devpulse.security import assert_public_target, require_api_key
 
 
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_database()
@@ -31,6 +32,7 @@ async def lifespan(_: FastAPI):
                 pass
 
 
+
 app = FastAPI(
     title="DevPulse API",
     description="HTTP uptime monitoring, latency tracking and incident management.",
@@ -44,21 +46,12 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/ready")
-def readiness(db: Session = Depends(get_db)):
-    try:
-        db.execute(select(1))
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Database is unavailable") from exc
-    return {"status": "ready"}
-
-
-@app.get("/metrics", include_in_schema=False, dependencies=[Depends(require_api_key)])
+@app.get("/metrics", include_in_schema=False)
 def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.post("/targets", response_model=TargetResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_api_key)])
+@app.post("/targets", response_model=TargetResponse, status_code=status.HTTP_201_CREATED)
 def create_target(payload: TargetCreate, db: Session = Depends(get_db)):
     settings = get_settings()
     try:
@@ -78,12 +71,12 @@ def create_target(payload: TargetCreate, db: Session = Depends(get_db)):
     return target
 
 
-@app.get("/targets", response_model=list[TargetResponse], dependencies=[Depends(require_api_key)])
+@app.get("/targets", response_model=list[TargetResponse])
 def list_targets(db: Session = Depends(get_db)):
     return db.scalars(select(Target).order_by(Target.id.desc())).all()
 
 
-@app.get("/targets/{target_id}", response_model=TargetResponse, dependencies=[Depends(require_api_key)])
+@app.get("/targets/{target_id}", response_model=TargetResponse)
 def get_target(target_id: int, db: Session = Depends(get_db)):
     target = db.get(Target, target_id)
     if target is None:
@@ -91,7 +84,7 @@ def get_target(target_id: int, db: Session = Depends(get_db)):
     return target
 
 
-@app.delete("/targets/{target_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_api_key)])
+@app.delete("/targets/{target_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_target(target_id: int, db: Session = Depends(get_db)):
     target = db.get(Target, target_id)
     if target is None:
@@ -101,7 +94,7 @@ def delete_target(target_id: int, db: Session = Depends(get_db)):
     return Response(status_code=204)
 
 
-@app.post("/targets/{target_id}/check", response_model=CheckResponse, dependencies=[Depends(require_api_key)])
+@app.post("/targets/{target_id}/check", response_model=CheckResponse)
 async def check_target(target_id: int, db: Session = Depends(get_db)):
     target = db.get(Target, target_id)
     if target is None:
@@ -109,7 +102,8 @@ async def check_target(target_id: int, db: Session = Depends(get_db)):
     return await run_check(db, target)
 
 
-@app.get("/targets/{target_id}/checks", response_model=list[CheckResponse], dependencies=[Depends(require_api_key)])
+
+@app.get("/targets/{target_id}/checks", response_model=list[CheckResponse])
 def check_history(target_id: int, db: Session = Depends(get_db)):
     if db.get(Target, target_id) is None:
         raise HTTPException(status_code=404, detail="Target not found")
@@ -120,7 +114,7 @@ def check_history(target_id: int, db: Session = Depends(get_db)):
     ).all()
 
 
-@app.get("/incidents", response_model=list[IncidentResponse], dependencies=[Depends(require_api_key)])
+@app.get("/incidents", response_model=list[IncidentResponse])
 def list_incidents(active: bool | None = None, db: Session = Depends(get_db)):
     statement = select(Incident).order_by(Incident.created_at.desc())
     if active is not None:
