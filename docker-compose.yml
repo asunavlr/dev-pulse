@@ -17,7 +17,11 @@ services:
     ports:
       - "8000:8000"
     environment:
+      ENVIRONMENT: development
+      API_KEY: ${API_KEY:-dev-only-change-me}
       DATABASE_URL: postgresql+psycopg://devpulse:devpulse@db:5432/devpulse
+      SCHEDULER_ENABLED: "true"
+      CHECK_INTERVAL_SECONDS: 60
     depends_on:
       db:
         condition: service_healthy
